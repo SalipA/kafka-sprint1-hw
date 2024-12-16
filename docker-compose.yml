@@ -1,0 +1,94 @@
+version: "3.9"
+
+services:
+  kafka-0:
+    image: bitnami/kafka:3.4
+    ports:
+      - "9094:9094"
+    environment:
+      - KAFKA_ENABLE_KRAFT=yes # включение режима KRaft
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller # роль узла в процессе
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER #слушатель для контроллера, который используется для его связис другими узлами
+      - ALLOW_PLAINTEXT_LISTENER=yes # брокер принимает подключения и передает данные без шифрования
+      - KAFKA_CFG_NODE_ID=0 # идентификатор узла
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093 #список всех контроллеров кластера с их идентификаторами, адресами и портами.
+      - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv # идентификатор кластера
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094 # адреса и порты, на которых Kafka принимает соединения
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-0:9092,EXTERNAL://127.0.0.1:9094 # адреса и порты для подключения клиентов
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT #протокол шифрования данных
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=false # Выключение автоматического создание топиков
+      - MIN_IN_SYNC_REPLICAS_CONFIG=2 # минимальное количесто синхронизированых реплик
+    volumes:
+      - kafka_0_data:/bitnami/kafka
+
+
+
+  kafka-1:
+    image: bitnami/kafka:3.4
+    ports:
+      - "9095:9095"
+    environment:
+      - KAFKA_ENABLE_KRAFT=yes
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
+      - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9095
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-1:9092,EXTERNAL://127.0.0.1:9095
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=false
+      - MIN_IN_SYNC_REPLICAS_CONFIG=2
+
+    volumes:
+      - kafka_1_data:/bitnami/kafka
+
+  kafka-2:
+    image: bitnami/kafka:3.4
+    ports:
+      - "9096:9096"
+    environment:
+      - KAFKA_ENABLE_KRAFT=yes
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_NODE_ID=2
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
+      - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9096
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-2:9092,EXTERNAL://127.0.0.1:9096
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=false
+      - MIN_IN_SYNC_REPLICAS_CONFIG=2
+    volumes:
+      - kafka_2_data:/bitnami/kafka
+
+  ui:
+    image: provectuslabs/kafka-ui:v0.7.0
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS=kafka-0:9092
+      - KAFKA_CLUSTERS_0_NAME=kraft
+
+  kafka-sprint1-app:
+    build: ./
+    ports:
+      - "8081:8081"
+    depends_on:
+      - kafka-0
+    environment:
+      - KAFKA_BOOTSTRAP_SERVER=kafka-0:9092 # адрес брокера
+      - ORDERS_TOPIC=orders # название топика, с которым будут работать Продюсеры и Консьюмеры приложения
+      - ACKS_CONFIG=1 # гарантия доставки At Least Oncе, подтверждение от 1 брокера (лидера)
+      - RETRIES_CONFIG=3 # повторить отправку сообщения 3 раза при ошибках
+      - SEND_MESSAGES_SCHEDULE=*/10 * * * * * # расписание отправки сообщений продюсером
+      - SESSION_TIMEOUT_MS_CONFIG=120000 # время, по истечении которого в случае отсутствия активности консьюмера,брокер исключит его из группы
+      - TOPIC_SEARCH_INTERVAL_MS=60000 # интервал между попытками проверки наличия топика
+
+
+volumes:
+  kafka_0_data:
+  kafka_1_data:
+  kafka_2_data:
